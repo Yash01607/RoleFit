@@ -1,24 +1,18 @@
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
-from typing import Optional
-
+# app/core/database.py
+from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
-
-client: Optional[AsyncIOMotorClient] = None
-db: Optional[AsyncIOMotorDatabase] = None
+from fastapi import FastAPI
+from fastapi import Request
 
 
-async def connect_to_mongo() -> None:
-    global client, db
-    client = AsyncIOMotorClient(settings.mongo_uri)
-    db = client[settings.MONGO_DB]
-    logger.info("Connected to MongoDB at %s", settings.mongo_uri)
+async def connect_to_mongo(app: FastAPI):
+    app.state.mongo_client = AsyncIOMotorClient(settings.mongo_uri)
+    app.state.mongo_db = app.state.mongo_client[settings.MONGO_DB]
 
 
-async def close_mongo_connection() -> None:
-    global client
-    if client:
-        client.close()
-        logger.info("MongoDB connection closed")
+async def close_mongo_connection(app: FastAPI):
+    app.state.mongo_client.close()
+
+
+def get_db(request: Request):
+    return request.app.state.mongo_db

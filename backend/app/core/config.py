@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ENV: str = "development"
     DEBUG: bool = True
 
-    ALLOWED_ORIGINS: List[str]=["*"]
+    ALLOWED_ORIGINS: List[str] = ["*"]
 
     LOG_LEVEL: str = "INFO"
 
@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     MONGO_HOST: str = "localhost"
     MONGO_PORT: int = 27017
     MONGO_DB: str = "rolefit_db"
+
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 24 * 60
+    JWT_SECRET: str = None
+    JWT_ALGORITHM: str = "HS256"
 
     @field_validator("MONGO_PASSWORD", mode="before")
     def encode_password(cls, v: Optional[str]) -> Optional[str]:
