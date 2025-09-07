@@ -8,3 +8,4 @@ class UserDB(BaseModelDB):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     is_superuser: bool = False
+    primary_workspace_id: Optional[str] = None

@@ -1,7 +1,7 @@
 from typing import TypeVar, Generic, Optional
 from pydantic import BaseModel
 
-from app.models.schema.general.error_detail import ErrorDetail
+from app.models.schema.fastapi.error_detail import ErrorDetail
 
 T = TypeVar("T")
 

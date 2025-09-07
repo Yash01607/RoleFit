@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.core.database import get_db
+from app.core.database import Collections, get_collections
 from app.models.schema.user.user_create import UserCreate
 from app.models.schema.user.user_out import UserOut
 from app.services.auth_service import (
@@ -9,35 +9,52 @@ from app.services.auth_service import (
     authenticate_user,
     create_token_for_user,
 )
-from app.models.schema.general.standard_response import (
+from app.models.schema.fastapi.standard_response import (
     StandardResponse,
     success_response,
 )
-from app.models.schema.user.login_response import LoginResponse
+# from app.models.schema.user.login_response import LoginResponse
+from app.services.workspace_service import create_default_workspace
+from app.services.user_service import update_user
+from app.models.schema.user.user_update import UserUpdate
 
 router = APIRouter()
 
 
 @router.post("/signup", response_model=StandardResponse[UserOut])
-async def signup(user: UserCreate, db=Depends(get_db)):
-    """Register a new user."""
-    existing_user = await db["users"].find_one({"email": user.email})
+async def signup(user: UserCreate, collections: Collections = Depends(get_collections)):
+    existing_user = await collections.users.find_one({"email": user.email})
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists"
         )
 
-    new_user = await create_user(user, db)
-    return success_response(UserOut(**new_user.model_dump()))
+    new_user = await create_user(user, collections)
+    default_workspace = await create_default_workspace(new_user.id, collections)
+    _ = await update_user(
+        user_id=new_user.id,
+        update_data=UserUpdate(primary_workspace_id=default_workspace.id),
+        collections=collections,
+    )
+    return success_response(
+        UserOut(
+            workspace_id=default_workspace.id,
+            workspace_name=default_workspace.name,
+            email=new_user.email,
+            first_name=new_user.first_name,
+            last_name=new_user.last_name,
+            id=new_user.id,
+            is_superuser=new_user.is_superuser,
+        )
+    )
 
 
-@router.post("/login", response_model=StandardResponse[LoginResponse])
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
-    """
-    Login endpoint using OAuth2PasswordRequestForm.
-    Returns JWT token.
-    """
-    user = await authenticate_user(form_data.username, form_data.password, db)
+@router.post("/login")
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    collections: Collections = Depends(get_collections),
+):
+    user = await authenticate_user(form_data.username, form_data.password, collections)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,4 +62,4 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get
         )
 
     token = create_token_for_user(user)
-    return success_response(LoginResponse(access_token=token, token_type="bearer"))
+    return {"access_token": token, "token_type": "bearer"}

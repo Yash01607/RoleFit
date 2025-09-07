@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     JWT_SECRET: str = None
     JWT_ALGORITHM: str = "HS256"
 
+    TOKEN_URL: str = "/api/login"
+
+    UPLOAD_DIR: Path = Path("/tmp/resume_uploads")
+    MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024
+
+    DEFAULT_WORKSPACE_NAME: str = PROJECT_NAME
+
     @field_validator("MONGO_PASSWORD", mode="before")
     def encode_password(cls, v: Optional[str]) -> Optional[str]:
         if v:

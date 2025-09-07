@@ -6,8 +6,8 @@ from fastapi.encoders import jsonable_encoder
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from datetime import datetime
 
-from app.models.schema.general.error_detail import ErrorDetail
-from app.models.schema.general.standard_response import StandardResponse
+from app.models.schema.fastapi.error_detail import ErrorDetail
+from app.models.schema.fastapi.standard_response import StandardResponse
 
 
 def register_exception_handlers(app: FastAPI):

@@ -1,18 +1,25 @@
-# app/core/database.py
+from fastapi import FastAPI, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
-from fastapi import FastAPI
-from fastapi import Request
+from app.models.schema.fastapi.db_collections import Collections
+from app.models.schema.fastapi.app_state import AppState
 
 
 async def connect_to_mongo(app: FastAPI):
-    app.state.mongo_client = AsyncIOMotorClient(settings.mongo_uri)
-    app.state.mongo_db = app.state.mongo_client[settings.MONGO_DB]
+    client = AsyncIOMotorClient(settings.mongo_uri)
+    db = client[settings.MONGO_DB]
+
+    state: AppState = app.state
+    state.mongo_client = client
+    state.mongo_db = db
+    state.collections = Collections(db)
 
 
 async def close_mongo_connection(app: FastAPI):
-    app.state.mongo_client.close()
+    state: AppState = app.state
+    state.mongo_client.close()
 
 
-def get_db(request: Request):
-    return request.app.state.mongo_db
+def get_collections(request: Request) -> Collections:
+    state: AppState = request.app.state
+    return state.collections
