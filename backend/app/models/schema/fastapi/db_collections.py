@@ -10,6 +10,7 @@ class Collections:
         self.users: AsyncIOMotorCollection = db["users"]
         self.workspaces: AsyncIOMotorCollection = db["workspaces"]
         self.resume_parsed: AsyncIOMotorCollection = db["resume_parsed"]
+        self.job_descriptions: AsyncIOMotorCollection = db["job_descriptions"]
 
         self.resume_files: AsyncIOMotorGridFSBucket = AsyncIOMotorGridFSBucket(
             db, bucket_name="resume_files"

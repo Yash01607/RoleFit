@@ -1,5 +1,9 @@
 from fastapi import APIRouter, UploadFile, HTTPException, Depends, Path
-from app.services.resume_service import parse_resume_bytes
+from app.services.resume_service import (
+    get_sections_from_resume,
+    is_resume_parsed,
+    insert_parsed_resume,
+)
 from app.models.schema.fastapi.standard_response import (
     StandardResponse,
     success_response,
@@ -12,10 +16,12 @@ from app.models.schema.resume.file_upload_response import FileUploadResponse
 from app.core.deps import get_current_workspace
 from app.models.schema.session.session_workspace import SessionWorkspace
 from app.models.db.resume_metadata import ResumeMetadata
-from app.models.db.resume_parsed import ParsedResumeDB
 from app.core.config import settings
+from app.services.resume_file_service import get_resume_file_contents
+from app.core.logging import get_logger
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 @router.post("/upload", response_model=StandardResponse[FileUploadResponse])
@@ -24,12 +30,22 @@ async def upload_resume(
     collections: Collections = Depends(get_collections),
     session: SessionWorkspace = Depends(get_current_workspace),
 ):
+    logger.info(
+        f"Resume upload attempt user_id={session.user_id}, workspace_id={session.workspace_id}, filename={file.filename}"
+    )
+
     if not is_pdf_file(file):
+        logger.warning(
+            f"Upload failed: Invalid file type filename={file.filename}, user_id={session.user_id}"
+        )
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
     contents = await file.read()
 
     if len(contents) > settings.MAX_UPLOAD_SIZE:
+        logger.warning(
+            f"Upload failed: File too large filename={file.filename}, size={len(contents)}, max={settings.MAX_UPLOAD_SIZE}, user_id={session.user_id}"
+        )
         raise HTTPException(
             status_code=413,
             detail=f"File too large. Max size is {settings.MAX_UPLOAD_SIZE} bytes",
@@ -46,6 +62,10 @@ async def upload_resume(
         metadata=metadata.model_dump(),
     )
 
+    logger.info(
+        f"Resume uploaded successfully file_id={metadata.id}, filename={file.filename}, size={len(contents)}, user_id={session.user_id}, workspace_id={session.workspace_id}"
+    )
+
     return success_response(FileUploadResponse(file_id=metadata.id))
 
 
@@ -55,32 +75,24 @@ async def upload_and_parse_resume(
     collections: Collections = Depends(get_collections),
     session: SessionWorkspace = Depends(get_current_workspace),
 ):
-    file_doc = await collections.resume_files_collection.find_one(
-        {"metadata.id": resume_id, "metadata.workspace_id": session.workspace_id}
+    logger.info(
+        f"Resume parse attempt resume_id={resume_id}, user_id={session.user_id}, workspace_id={session.workspace_id}"
     )
-    if not file_doc:
-        raise HTTPException(status_code=404, detail="File not found")
 
-    already_parsed = collections.resume_parsed.find_one({"file_id": resume_id})
+    contents = await get_resume_file_contents(
+        resume_id, session.workspace_id, collections
+    )
 
-    if already_parsed:
-        raise HTTPException(
-            status_code=400,
-            detail="This resume has already been parsed",
-        )
+    is_resume_parsed(resume_id, collections)
 
-    grid_out = await collections.resume_files.open_download_stream(file_doc["_id"])
-    contents = await grid_out.read()
-    parsed = parse_resume_bytes(contents)
-    sections = {k: v for k, v in parsed.items()}
+    sections = get_sections_from_resume(contents)
 
-    _ = collections.resume_parsed.insert_one(
-        ParsedResumeDB(
-            file_id=resume_id,
-            owner_id=session.user_id,
-            workspace_id=session.workspace_id,
-            sections=sections,
-        ).model_dump()
+    await insert_parsed_resume(
+        resume_id, session.user_id, session.workspace_id, sections, collections
+    )
+
+    logger.info(
+        f"Resume parsed successfully resume_id={resume_id}, user_id={session.user_id}, workspace_id={session.workspace_id}, sections_count={len(sections)}"
     )
 
     return success_response(ParsedResume(sections=sections))

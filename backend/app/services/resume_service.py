@@ -1,7 +1,11 @@
 import re
 import string
 from typing import Dict, List
+
+from fastapi import HTTPException
 from app.utils.pdf.pdf_utils import extract_pdf_content
+from app.models.schema.fastapi.db_collections import Collections
+from app.models.db.resume_parsed import ParsedResumeDB
 
 # Canonical section groups. Keep lowercase terms only.
 SECTION_HEADINGS = [
@@ -78,7 +82,7 @@ def clean_skills(skills_text: List[str] | str) -> List[str]:
         text = skills_text
 
     # split on common delimiters including colon as requested
-    raw_skills = re.split(r"[,;•:\n\\u2022]", text)
+    raw_skills = re.split(r"[,;:\n\u2022•]", text)
     skills = [s.strip().lower() for s in raw_skills if s.strip()]
     return skills
 
@@ -95,3 +99,33 @@ def parse_resume_bytes(data: bytes) -> Dict[str, List[str]]:
             parsed_resume[sec] = [line.strip() for line in content if line.strip()]
 
     return parsed_resume
+
+
+def get_sections_from_resume(data: bytes) -> Dict[str, List[str]]:
+    parsed = parse_resume_bytes(data)
+    sections = {k: v for k, v in parsed.items()}
+
+    return sections
+
+
+async def insert_parsed_resume(
+    resume_id: str, owner_id: str, workspace_id: str, sections, collections: Collections
+):
+    _ = await collections.resume_parsed.insert_one(
+        ParsedResumeDB(
+            file_id=resume_id,
+            owner_id=owner_id,
+            workspace_id=workspace_id,
+            sections=sections,
+        ).model_dump()
+    )
+
+
+async def is_resume_parsed(resume_id: str, collections: Collections):
+    already_parsed = await collections.resume_parsed.find_one({"file_id": resume_id})
+
+    if already_parsed:
+        raise HTTPException(
+            status_code=400,
+            detail="This resume has already been parsed",
+        )
