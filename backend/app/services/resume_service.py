@@ -6,18 +6,7 @@ from fastapi import HTTPException
 from app.utils.pdf.pdf_utils import extract_pdf_content
 from app.models.schema.fastapi.db_collections import Collections
 from app.models.db.resume_parsed import ParsedResumeDB
-
-# Canonical section groups. Keep lowercase terms only.
-SECTION_HEADINGS = [
-    ["skill", "technologies", "technology", "tool"],
-    ["experience", "work history", "employment", "career"],
-    ["project"],
-    ["education", "academics", "qualification", "degree"],
-    ["achievement", "accomplishment", "award", "honor", "recognition"],
-    ["certification", "license", "course", "training"],
-    ["summary", "profile", "objective", "about", "introduction"],
-    ["competition", "competitive", "hackathon", "coding contests", "challenges"],
-]
+from app.constants.resume import SECTION_HEADINGS
 
 
 def normalize_line(line: str) -> str:
