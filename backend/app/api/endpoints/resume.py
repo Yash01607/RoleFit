@@ -1,3 +1,4 @@
+from typing import List
 from fastapi import APIRouter, UploadFile, Depends, Path
 from app.services.resume_service import (
     get_sections_from_resume,
@@ -15,6 +16,8 @@ from app.models.schema.resume.file_upload_response import FileUploadResponse
 from app.core.deps import get_current_workspace
 from app.models.schema.session.session_workspace import SessionWorkspace
 from app.services.resume_file_service import (
+    get_all_resumes,
+    get_resume_by_id,
     get_resume_file_contents,
     upload_resume_file,
 )
@@ -70,3 +73,40 @@ async def upload_and_parse_resume(
     )
 
     return success_response(ParsedResume(sections=sections))
+
+
+@router.get("/{resume_id}", response_model=StandardResponse[ParsedResume])
+async def get_resume_by_id_handler(
+    resume_id: str = Path(..., description="UUID of the resume"),
+    collections: Collections = Depends(get_collections),
+    session: SessionWorkspace = Depends(get_current_workspace),
+):
+    logger.info(
+        f"Get resume by id attempt resume_id={resume_id}, user_id={session.user_id}, workspace_id={session.workspace_id}"
+    )
+
+    parsed_resume = await get_resume_by_id(resume_id, session, collections)
+
+    logger.info(
+        f"Resume fetched successfully resume_id={resume_id}, user_id={session.user_id}, workspace_id={session.workspace_id}"
+    )
+
+    return success_response(parsed_resume)
+
+
+@router.get("/", response_model=StandardResponse[List[ParsedResume]])
+async def get_all_resumes_handler(
+    collections: Collections = Depends(get_collections),
+    session: SessionWorkspace = Depends(get_current_workspace),
+):
+    logger.info(
+        f"Get all resumes attempt user_id={session.user_id}, workspace_id={session.workspace_id}"
+    )
+
+    resumes = await get_all_resumes(session, collections)
+
+    logger.info(
+        f"Fetched {len(resumes)} resumes for workspace_id={session.workspace_id}, user_id={session.user_id}"
+    )
+
+    return success_response(resumes)
